@@ -8,32 +8,69 @@ const Player: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const startTimeRef = useRef<number>(0);
-  const hasRealSrc = useRef(false);
-  const userInteracted = useRef(false);
+  const startAtRef = useRef<number>(0);
+  const isSimulatedRef = useRef(true);
+  const rafRef = useRef<number>(0);
 
   const hasAudio = !!currentTrack?.audioUrl;
+
+  const tick = useCallback(() => {
+    const el = audioRef.current;
+    if (!el || !isSimulatedRef.current) return;
+
+    const elapsed = (Date.now() - startAtRef.current) / 1000;
+    const totalSec = currentTrack?.durationMs ? currentTrack.durationMs / 1000 : 180;
+    const pct = Math.min((elapsed / totalSec) * 100, 100);
+    setProgress(pct);
+    setCurrentTime(Math.min(elapsed, totalSec));
+
+    if (pct >= 100) {
+      togglePlay();
+    } else {
+      rafRef.current = requestAnimationFrame(tick);
+    }
+  }, [currentTrack?.durationMs, togglePlay]);
+
+  const startTick = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    isSimulatedRef.current = true;
+    startAtRef.current = Date.now();
+    rafRef.current = requestAnimationFrame(tick);
+  }, [tick]);
+
+  const stopTick = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+  }, []);
 
   const handleTimeUpdate = useCallback(() => {
     const el = audioRef.current;
     if (!el || isNaN(el.duration)) return;
+    isSimulatedRef.current = false;
+    cancelAnimationFrame(rafRef.current);
     const pct = (el.currentTime / el.duration) * 100;
     setProgress(pct);
     setCurrentTime(el.currentTime);
   }, []);
 
   const handleEnded = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
     setProgress(100);
     togglePlay();
   }, [togglePlay]);
 
-  const handleLoaded = useCallback(() => {
-    hasRealSrc.current = true;
-  }, []);
+  const handleLoadedData = useCallback(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (isPlaying) {
+      el.play().then(() => {
+        isSimulatedRef.current = false;
+        cancelAnimationFrame(rafRef.current);
+      }).catch(() => {});
+    }
+  }, [isPlaying]);
 
   const handleError = useCallback(() => {
     if (audioRef.current) audioRef.current.src = '';
-    hasRealSrc.current = false;
   }, []);
 
   useEffect(() => {
@@ -43,28 +80,26 @@ const Player: React.FC = () => {
   }, [volume]);
 
   useEffect(() => {
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
     const el = audioRef.current;
     if (!el || !currentTrack) return;
 
+    cancelAnimationFrame(rafRef.current);
     setProgress(0);
     setCurrentTime(0);
-    startTimeRef.current = 0;
-    hasRealSrc.current = false;
+    isSimulatedRef.current = true;
+    startAtRef.current = 0;
 
     if (currentTrack.audioUrl) {
       el.src = currentTrack.audioUrl;
       el.load();
-      if (isPlaying) {
-        el.play().catch(() => {
-          hasRealSrc.current = false;
-          startTimeRef.current = Date.now();
-        });
-      }
     } else {
       el.src = '';
-      if (isPlaying) {
-        startTimeRef.current = Date.now();
-      }
     }
   }, [currentTrack?.id]);
 
@@ -73,36 +108,20 @@ const Player: React.FC = () => {
     if (!el) return;
 
     if (isPlaying) {
-      if (hasRealSrc.current) {
-        el.play().catch(() => {});
+      if (!currentTrack?.audioUrl) {
+        startTick();
+      } else if (el.readyState >= 2 && el.duration && !isNaN(el.duration)) {
+        el.play().catch(() => {
+          startTick();
+        });
       } else {
-        startTimeRef.current = Date.now() - (currentTime * 1000);
+        startTick();
       }
     } else {
+      stopTick();
       el.pause();
     }
   }, [isPlaying]);
-
-  useEffect(() => {
-    if (!isPlaying || !currentTrack) return;
-    if (hasRealSrc.current) return;
-
-    const interval = setInterval(() => {
-      const elapsed = (Date.now() - startTimeRef.current) / 1000;
-      const totalSec = currentTrack.durationMs / 1000;
-      const pct = Math.min((elapsed / totalSec) * 100, 100);
-      setProgress(pct);
-      setCurrentTime(Math.min(elapsed, totalSec));
-      if (pct >= 100) {
-        togglePlay();
-      }
-    }, 200);
-    return () => clearInterval(interval);
-  }, [isPlaying, currentTrack?.id, hasAudio]);
-
-  useEffect(() => {
-    userInteracted.current = true;
-  }, []);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -121,7 +140,7 @@ const Player: React.FC = () => {
             preload="auto"
             onTimeUpdate={handleTimeUpdate}
             onEnded={handleEnded}
-            onLoadedData={handleLoaded}
+            onLoadedData={handleLoadedData}
             onError={handleError}
           />
           <motion.div
@@ -145,7 +164,7 @@ const Player: React.FC = () => {
                 </span>
               </div>
               <div className="h-1 w-full bg-surfaceHighlight/50 rounded-full overflow-hidden cursor-pointer">
-                <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${progress}%` }} />
+                <div className="h-full bg-primary rounded-full" style={{ width: `${progress}%` }} />
               </div>
             </div>
 
