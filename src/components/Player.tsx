@@ -7,19 +7,19 @@ const Player: React.FC = () => {
   const { currentTrack, isPlaying, volume, togglePlay, setVolume } = usePlayerStore();
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const startTimeRef = useRef<number>(0);
-  const hasRealAudio = useRef(false);
+  const hasRealSrc = useRef(false);
+  const userInteracted = useRef(false);
 
-  const isMp4 = currentTrack?.audioUrl?.endsWith('.mp4');
+  const hasAudio = !!currentTrack?.audioUrl;
 
   const handleTimeUpdate = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || isNaN(video.duration)) return;
-    hasRealAudio.current = true;
-    const pct = (video.currentTime / video.duration) * 100;
+    const el = audioRef.current;
+    if (!el || isNaN(el.duration)) return;
+    const pct = (el.currentTime / el.duration) * 100;
     setProgress(pct);
-    setCurrentTime(video.currentTime);
+    setCurrentTime(el.currentTime);
   }, []);
 
   const handleEnded = useCallback(() => {
@@ -27,42 +27,66 @@ const Player: React.FC = () => {
     togglePlay();
   }, [togglePlay]);
 
+  const handleLoaded = useCallback(() => {
+    hasRealSrc.current = true;
+  }, []);
+
+  const handleError = useCallback(() => {
+    if (audioRef.current) audioRef.current.src = '';
+    hasRealSrc.current = false;
+  }, []);
+
   useEffect(() => {
-    if (!currentTrack) return;
-    hasRealAudio.current = false;
+    const el = audioRef.current;
+    if (!el) return;
+    el.volume = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el || !currentTrack) return;
+
     setProgress(0);
     setCurrentTime(0);
     startTimeRef.current = 0;
-    const video = videoRef.current;
-    if (video && currentTrack.audioUrl) {
-      video.src = currentTrack.audioUrl;
-      video.currentTime = 0;
-      if (isPlaying) {
-        video.play().catch(() => {});
-      }
-    }
-  }, [currentTrack]);
+    hasRealSrc.current = false;
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (isPlaying) {
-      if (video.duration && !isNaN(video.duration)) {
-        video.play().catch(() => {});
-      } else if (!hasRealAudio.current) {
-        startTimeRef.current = Date.now();
+    if (currentTrack.audioUrl) {
+      el.src = currentTrack.audioUrl;
+      el.load();
+      if (isPlaying) {
+        el.play().catch(() => {
+          hasRealSrc.current = false;
+          startTimeRef.current = Date.now();
+        });
       }
     } else {
-      video.pause();
+      el.src = '';
+      if (isPlaying) {
+        startTimeRef.current = Date.now();
+      }
+    }
+  }, [currentTrack?.id]);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+
+    if (isPlaying) {
+      if (hasRealSrc.current) {
+        el.play().catch(() => {});
+      } else {
+        startTimeRef.current = Date.now() - (currentTime * 1000);
+      }
+    } else {
+      el.pause();
     }
   }, [isPlaying]);
 
   useEffect(() => {
-    if (videoRef.current) videoRef.current.volume = volume;
-  }, [volume]);
+    if (!isPlaying || !currentTrack) return;
+    if (hasRealSrc.current) return;
 
-  useEffect(() => {
-    if (!isPlaying || !currentTrack || hasRealAudio.current) return;
     const interval = setInterval(() => {
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
       const totalSec = currentTrack.durationMs / 1000;
@@ -74,7 +98,11 @@ const Player: React.FC = () => {
       }
     }, 200);
     return () => clearInterval(interval);
-  }, [isPlaying, currentTrack, togglePlay]);
+  }, [isPlaying, currentTrack?.id, hasAudio]);
+
+  useEffect(() => {
+    userInteracted.current = true;
+  }, []);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -88,14 +116,14 @@ const Player: React.FC = () => {
     <AnimatePresence>
       {currentTrack && (
         <>
-          {isMp4 && (
-            <video
-              ref={videoRef}
-              style={{ display: 'none' }}
-              onTimeUpdate={handleTimeUpdate}
-              onEnded={handleEnded}
-            />
-          )}
+          <audio
+            ref={audioRef}
+            preload="auto"
+            onTimeUpdate={handleTimeUpdate}
+            onEnded={handleEnded}
+            onLoadedData={handleLoaded}
+            onError={handleError}
+          />
           <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}

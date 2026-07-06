@@ -18,7 +18,7 @@ const Studio: React.FC = () => {
   const [duration, setDuration] = useState<'short' | 'full'>('short');
 
   const { isGenerating, progress, startGeneration, updateProgress, finishGeneration } = useGeneratorStore();
-  const { playTrack } = usePlayerStore();
+  const { playTrack, setTrack } = usePlayerStore();
   const { user, setLoginModalOpen } = useAuthStore();
 
   const getTitle = (): string => {
@@ -52,7 +52,7 @@ const Studio: React.FC = () => {
           durationMs: duration === 'short' ? 30000 : 180000,
           createdAt: new Date().toISOString()
         };
-        playTrack(newTrack);
+        setTrack(newTrack);
       } else {
         updateProgress(Math.min(currentProgress, 99));
       }

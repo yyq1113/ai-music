@@ -8,6 +8,7 @@ interface PlayerState {
   playTrack: (track: Track) => void;
   togglePlay: () => void;
   setVolume: (volume: number) => void;
+  setTrack: (track: Track) => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set) => ({
@@ -17,6 +18,7 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   playTrack: (track) => set({ currentTrack: track, isPlaying: true }),
   togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
   setVolume: (volume) => set({ volume }),
+  setTrack: (track) => set({ currentTrack: track, isPlaying: false }),
 }));
 
 interface GeneratorState {
