@@ -47,7 +47,7 @@ const Studio: React.FC = () => {
           title,
           prompt,
           style: selectedStyle,
-          audioUrl: title === '城市夜景' ? '/WeChat_20260626134120.mp4' : '',
+          audioUrl: title === '城市夜景' ? `${import.meta.env.BASE_URL}WeChat_20260626134120.mp4` : '',
           coverUrl: 'https://images.unsplash.com/photo-1557672172-298e090bd0f1?auto=format&fit=crop&q=80&w=400&h=400',
           durationMs: duration === 'short' ? 30000 : 180000,
           createdAt: new Date().toISOString()
