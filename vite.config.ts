@@ -4,8 +4,8 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import { traeBadgePlugin } from 'vite-plugin-trae-solo-badge';
 
 // https://vite.dev/config/
-export default defineConfig({
-  base: '/ai-music/',
+export default defineConfig(({ mode }) => ({
+  base: mode === 'production' ? '/ai-music/' : '/',
   build: {
     sourcemap: 'hidden',
   },
@@ -28,4 +28,4 @@ export default defineConfig({
     }), 
     tsconfigPaths()
   ],
-})
+}))
