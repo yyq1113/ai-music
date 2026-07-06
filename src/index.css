@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-textMain font-sans antialiased overflow-x-hidden;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surfaceHighlight rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-white border border-surfaceHighlight/60 shadow-sm;
+  }
+}
